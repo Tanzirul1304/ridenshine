@@ -1,0 +1,41 @@
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ridenshine
+      POSTGRES_USER: ridenshine
+      POSTGRES_PASSWORD: ridenshine
+    ports:
+      - "5432:5432"
+    volumes:
+      - ridenshine_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ridenshine"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  backend:
+    build: ./backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/ridenshine
+      SPRING_DATASOURCE_USERNAME: ridenshine
+      SPRING_DATASOURCE_PASSWORD: ridenshine
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: ChangeMe123!
+      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8080/api
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+volumes:
+  ridenshine_data:

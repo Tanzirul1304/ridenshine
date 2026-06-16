@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+<rect width="800" height="500" fill="#111"/><circle cx="400" cy="230" r="135" fill="none" stroke="#e31b23" stroke-width="24" stroke-dasharray="35 12"/>
+<path d="M260 290h280M305 285l50-95h95l55 95M330 205h80" stroke="#eee" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<circle cx="310" cy="305" r="55" fill="none" stroke="#eee" stroke-width="18"/><circle cx="500" cy="305" r="55" fill="none" stroke="#eee" stroke-width="18"/>
+<text x="400" y="445" fill="#fff" font-family="Arial" font-size="40" text-anchor="middle">RideNShine Product</text></svg>

@@ -1,0 +1,3 @@
+export default function ProductCard({ product }) {
+  return <article className="card product-card"><img src={product.imageUrl || '/product-placeholder.svg'} alt={product.name} onError={e => { e.currentTarget.src='/product-placeholder.svg' }} /><div className="card-body"><div className="tag-row"><span className="tag">{product.category}</span><span className={product.inStock ? 'stock yes' : 'stock no'}>{product.inStock ? `In stock (${product.stockQuantity})` : 'Stock out'}</span></div><h3>{product.name}</h3><p className="muted">{product.brand || 'RideNShine'}</p><p>{product.description}</p><div className="price">৳{Number(product.price).toLocaleString()}</div><a className="button small" href="tel:+8801973444139">Call to order</a></div></article>
+}
