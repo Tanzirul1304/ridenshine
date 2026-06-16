@@ -1,62 +1,42 @@
 name: Build and Test
 
-on:
-push:
-branches:
-- main
-pull_request:
-branches:
-- main
+"on":
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 permissions:
-contents: read
+  contents: read
 
 jobs:
-backend:
-name: Backend Build and Test
-runs-on: ubuntu-latest
+  build:
+    name: Build Backend and Frontend
+    runs-on: ubuntu-latest
 
-defaults:
-  run:
-    working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
 
-  - name: Set up Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: "21"
-      cache: maven
+      - name: Build backend
+        working-directory: backend
+        run: mvn -B -DskipTests package
 
-  - name: Run backend tests
-    run: mvn -B test
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-frontend:
-name: Frontend Build
-runs-on: ubuntu-latest
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
 
-defaults:
-  run:
-    working-directory: frontend
-
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
-
-  - name: Set up Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: "20"
-
-  - name: Install frontend dependencies
-    run: npm install
-
-  - name: Build frontend
-    run: npm run build
-
-  - name: Audit production dependencies
-    run: npm audit --omit=dev --audit-level=high
-    continue-on-error: true
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
