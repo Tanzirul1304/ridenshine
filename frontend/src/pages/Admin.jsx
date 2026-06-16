@@ -6,10 +6,48 @@ const emptyProduct={name:'',category:'',brand:'',price:'',stockQuantity:'',descr
 const emptyService={name:'',description:'',price:'',durationMinutes:30,active:true}
 const emptyOffer={title:'',description:'',discountPercent:0,validUntil:'',active:true}
 
+const MAX_PRODUCT_IMAGE_BYTES = 6 * 1024 * 1024
+
+function compressProductImage(file) {
+ return new Promise((resolve, reject) => {
+  if (!file.type.startsWith('image/')) {
+   reject(new Error('Please choose a JPG, PNG, WEBP or another image file.'))
+   return
+  }
+  if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
+   reject(new Error('The selected image is larger than 6 MB. Please choose a smaller image.'))
+   return
+  }
+
+  const reader = new FileReader()
+  reader.onerror = () => reject(new Error('The image could not be read.'))
+  reader.onload = () => {
+   const image = new Image()
+   image.onerror = () => reject(new Error('The selected file is not a valid image.'))
+   image.onload = () => {
+    const maxDimension = 900
+    const scale = Math.min(1, maxDimension / Math.max(image.width, image.height))
+    const width = Math.max(1, Math.round(image.width * scale))
+    const height = Math.max(1, Math.round(image.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, width, height)
+    context.drawImage(image, 0, 0, width, height)
+    resolve(canvas.toDataURL('image/jpeg', 0.78))
+   }
+   image.src = reader.result
+  }
+  reader.readAsDataURL(file)
+ })
+}
+
 export default function Admin(){
  const [logged,setLogged]=useState(isAdminLoggedIn()); const [credentials,setCredentials]=useState({username:'admin',password:''}); const [loginError,setLoginError]=useState('');
  const [tab,setTab]=useState('overview'); const [data,setData]=useState({stats:null,products:[],services:[],bookings:[],reviews:[],offers:[],errors:[]}); const [message,setMessage]=useState(''); const [error,setError]=useState('');
- const [product,setProduct]=useState(emptyProduct); const [productEditId,setProductEditId]=useState(null); const [service,setService]=useState(emptyService); const [serviceEditId,setServiceEditId]=useState(null); const [offer,setOffer]=useState(emptyOffer); const [offerEditId,setOfferEditId]=useState(null)
+ const [product,setProduct]=useState(emptyProduct); const [productEditId,setProductEditId]=useState(null); const [productImageKey,setProductImageKey]=useState(0); const [service,setService]=useState(emptyService); const [serviceEditId,setServiceEditId]=useState(null); const [offer,setOffer]=useState(emptyOffer); const [offerEditId,setOfferEditId]=useState(null)
 
  async function load(){
   setError('')
@@ -24,8 +62,21 @@ export default function Admin(){
  async function login(e){e.preventDefault();setLoginError('');try{await adminLogin(credentials.username,credentials.password);setLogged(true)}catch{setLoginError('Invalid admin username or password.')}}
  function logout(){adminLogout();setLogged(false)}
  async function action(work,success){setMessage('');setError('');try{await work();setMessage(success);await load()}catch(e){setError(e.message)}}
- async function saveProduct(e){e.preventDefault();const body={...product,price:Number(product.price),stockQuantity:Number(product.stockQuantity)};await action(()=>api(productEditId?`/admin/products/${productEditId}`:'/admin/products',{method:productEditId?'PUT':'POST',body:JSON.stringify(body)},true),productEditId?'Product updated.':'Product added.');setProduct(emptyProduct);setProductEditId(null)}
- function editProduct(p){setProduct({...p});setProductEditId(p.id);window.scrollTo({top:0,behavior:'smooth'})}
+ async function saveProduct(e){e.preventDefault();const body={...product,price:Number(product.price),stockQuantity:Number(product.stockQuantity)};await action(()=>api(productEditId?`/admin/products/${productEditId}`:'/admin/products',{method:productEditId?'PUT':'POST',body:JSON.stringify(body)},true),productEditId?'Product updated.':'Product added.');setProduct(emptyProduct);setProductEditId(null);setProductImageKey(key=>key+1)}
+ function editProduct(p){setProduct({...p});setProductEditId(p.id);setProductImageKey(key=>key+1);window.scrollTo({top:0,behavior:'smooth'})}
+ async function chooseProductImage(e){
+  const file=e.target.files?.[0]
+  if(!file)return
+  setError('')
+  try{
+   const imageUrl=await compressProductImage(file)
+   setProduct(current=>({...current,imageUrl}))
+  }catch(imageError){
+   setError(imageError.message)
+   setProductImageKey(key=>key+1)
+  }
+ }
+ function removeProductImage(){setProduct(current=>({...current,imageUrl:''}));setProductImageKey(key=>key+1)}
  async function saveService(e){e.preventDefault();const body={...service,price:Number(service.price),durationMinutes:Number(service.durationMinutes)};await action(()=>api(serviceEditId?`/admin/services/${serviceEditId}`:'/admin/services',{method:serviceEditId?'PUT':'POST',body:JSON.stringify(body)},true),serviceEditId?'Service updated.':'Service added.');setService(emptyService);setServiceEditId(null)}
  function editService(s){setService({...s});setServiceEditId(s.id);window.scrollTo({top:0,behavior:'smooth'})}
  async function saveOffer(e){e.preventDefault();const body={...offer,discountPercent:Number(offer.discountPercent)};await action(()=>api(offerEditId?`/admin/offers/${offerEditId}`:'/admin/offers',{method:offerEditId?'PUT':'POST',body:JSON.stringify(body)},true),offerEditId?'Offer updated.':'Offer added.');setOffer(emptyOffer);setOfferEditId(null)}
@@ -36,7 +87,7 @@ export default function Admin(){
  const tabs=['overview','products','services','bookings','reviews','offers','errors']
  return <section className="section container admin"><div className="admin-title"><div><span className="eyebrow">Business operations</span><h1>Admin dashboard</h1></div><button className="button ghost small" onClick={logout}>Sign out</button></div><div className="admin-tabs">{tabs.map(t=><button key={t} className={tab===t?'active':''} onClick={()=>setTab(t)}>{t}</button>)}</div><Message type="success">{message}</Message><Message type="error">{error}</Message>
   {tab==='overview'&&<Overview stats={data.stats} />}
-  {tab==='products'&&<><form className="panel compact-form" onSubmit={saveProduct}><h2>{productEditId?'Edit product':'Add product'}</h2><input placeholder="Name" value={product.name} onChange={e=>setProduct({...product,name:e.target.value})} required/><input placeholder="Category" value={product.category} onChange={e=>setProduct({...product,category:e.target.value})} required/><input placeholder="Brand" value={product.brand||''} onChange={e=>setProduct({...product,brand:e.target.value})}/><input type="number" min="0" placeholder="Price BDT" value={product.price} onChange={e=>setProduct({...product,price:e.target.value})} required/><input type="number" min="0" placeholder="Stock" value={product.stockQuantity} onChange={e=>setProduct({...product,stockQuantity:e.target.value})} required/><input placeholder="Image URL (optional)" value={product.imageUrl||''} onChange={e=>setProduct({...product,imageUrl:e.target.value})}/><textarea placeholder="Description" value={product.description||''} onChange={e=>setProduct({...product,description:e.target.value})}/><label className="check"><input type="checkbox" checked={product.featured} onChange={e=>setProduct({...product,featured:e.target.checked})}/> Featured</label><button className="button small">{productEditId?'Save changes':'Add product'}</button>{productEditId&&<button type="button" className="button ghost small" onClick={()=>{setProduct(emptyProduct);setProductEditId(null)}}>Cancel</button>}</form><DataTable headers={['Name','Category','Price','Stock','Actions']} rows={data.products.map(p=>[p.name,p.category,`৳${p.price}`,p.stockQuantity,<div className="row-actions"><button onClick={()=>editProduct(p)}>Edit</button><button onClick={()=>action(()=>api(`/admin/products/${p.id}`,{method:'DELETE'},true),'Product removed.')}>Delete</button></div>])}/></>}
+  {tab==='products'&&<><form className="panel compact-form" onSubmit={saveProduct}><h2>{productEditId?'Edit product':'Add product'}</h2><input placeholder="Name" value={product.name} onChange={e=>setProduct({...product,name:e.target.value})} required/><input placeholder="Category" value={product.category} onChange={e=>setProduct({...product,category:e.target.value})} required/><input placeholder="Brand" value={product.brand||''} onChange={e=>setProduct({...product,brand:e.target.value})}/><input type="number" min="0" placeholder="Price BDT" value={product.price} onChange={e=>setProduct({...product,price:e.target.value})} required/><input type="number" min="0" placeholder="Stock" value={product.stockQuantity} onChange={e=>setProduct({...product,stockQuantity:e.target.value})} required/><div className="product-image-field"><label>Product picture<input key={productImageKey} type="file" accept="image/*" onChange={chooseProductImage}/></label><small>JPG, PNG or WEBP. The browser compresses the picture before saving it.</small>{product.imageUrl&&<div className="product-image-preview"><img src={product.imageUrl} alt="Product preview"/><button type="button" className="button ghost small" onClick={removeProductImage}>Remove picture</button></div>}</div><input placeholder="Image URL (optional alternative)" value={product.imageUrl?.startsWith('data:')?'':product.imageUrl||''} onChange={e=>setProduct({...product,imageUrl:e.target.value})}/><textarea placeholder="Description" value={product.description||''} onChange={e=>setProduct({...product,description:e.target.value})}/><label className="check"><input type="checkbox" checked={product.featured} onChange={e=>setProduct({...product,featured:e.target.checked})}/> Featured</label><button className="button small">{productEditId?'Save changes':'Add product'}</button>{productEditId&&<button type="button" className="button ghost small" onClick={()=>{setProduct(emptyProduct);setProductEditId(null);setProductImageKey(key=>key+1)}}>Cancel</button>}</form><DataTable headers={['Picture','Name','Category','Price','Stock','Actions']} rows={data.products.map(p=>[<img className="admin-product-thumb" src={p.imageUrl||'/product-placeholder.svg'} alt={p.name} onError={e=>{e.currentTarget.src='/product-placeholder.svg'}}/>,p.name,p.category,`৳${p.price}`,p.stockQuantity,<div className="row-actions"><button onClick={()=>editProduct(p)}>Edit</button><button onClick={()=>action(()=>api(`/admin/products/${p.id}`,{method:'DELETE'},true),'Product removed.')}>Delete</button></div>])}/></>}
   {tab==='services'&&<><form className="panel compact-form" onSubmit={saveService}><h2>{serviceEditId?'Edit service':'Add service'}</h2><input placeholder="Name" value={service.name} onChange={e=>setService({...service,name:e.target.value})} required/><input type="number" min="0" placeholder="Price BDT" value={service.price} onChange={e=>setService({...service,price:e.target.value})} required/><input type="number" min="5" placeholder="Duration minutes" value={service.durationMinutes} onChange={e=>setService({...service,durationMinutes:e.target.value})} required/><textarea placeholder="Description" value={service.description} onChange={e=>setService({...service,description:e.target.value})}/><label className="check"><input type="checkbox" checked={service.active} onChange={e=>setService({...service,active:e.target.checked})}/> Active</label><button className="button small">{serviceEditId?'Save changes':'Add service'}</button></form><DataTable headers={['Service','Price','Duration','Active','Actions']} rows={data.services.map(s=>[s.name,`৳${s.price}`,`${s.durationMinutes} min`,s.active?'Yes':'No',<div className="row-actions"><button onClick={()=>editService(s)}>Edit</button><button onClick={()=>action(()=>api(`/admin/services/${s.id}`,{method:'DELETE'},true),'Service removed.')}>Delete</button></div>])}/></>}
   {tab==='bookings'&&<DataTable headers={['Reference','Customer','Bike / Service','Date','Status']} rows={data.bookings.map(b=>[b.referenceCode,<span>{b.customerName}<br/><small>{b.phone}</small></span>,<span>{b.bikeModel}<br/><small>{b.service.name}</small></span>,b.preferredDate,<select value={b.status} onChange={e=>action(()=>api(`/admin/bookings/${b.id}/status`,{method:'PATCH',body:JSON.stringify({status:e.target.value})},true),'Booking status updated.')}>{['REQUESTED','CONFIRMED','IN_PROGRESS','COMPLETED','CANCELLED'].map(s=><option key={s}>{s}</option>)}</select>])}/>} 
   {tab==='reviews'&&<DataTable headers={['Customer','Rating','Comment','State','Actions']} rows={data.reviews.map(r=>[r.customerName,`${r.rating}/5`,r.comment,r.approved?'Approved':'Pending',<div className="row-actions">{!r.approved&&<button onClick={()=>action(()=>api(`/admin/reviews/${r.id}/approve`,{method:'PATCH'},true),'Review approved.')}>Approve</button>}<button onClick={()=>action(()=>api(`/admin/reviews/${r.id}`,{method:'DELETE'},true),'Review removed.')}>Delete</button></div>])}/>} 

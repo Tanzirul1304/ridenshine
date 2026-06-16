@@ -15,7 +15,7 @@ public class Product {
     @NotNull @DecimalMin("0.0") @Column(nullable = false) private BigDecimal price;
     @NotNull @Min(0) @Column(nullable = false) private Integer stockQuantity;
     @Column(length = 1200) private String description;
-    private String imageUrl;
+    @Column(columnDefinition = "TEXT") private String imageUrl;
     @Column(nullable = false) private boolean featured;
 
     public Long getId() { return id; }
